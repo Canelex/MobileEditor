@@ -1,3 +1,4 @@
+// Geometry variables
 let el = document.getElementById("page-list")
 let lx;
 let ly;
@@ -8,13 +9,10 @@ let s;
 let ww = Math.min(window.innerWidth, 768);
 let wh = window.innerHeight;
 
+// Transformations
 let translate = { x: 0, y: el.clientHeight };
 let scale = ww / el.clientWidth;
 constrain();
-
-function resetPage() {
-
-}
 
 function updateElementTransform() {
     // Offset the page
@@ -38,7 +36,6 @@ function updateElementTransform() {
     el.style.mozTransform = value;
     el.style.webkitTransform = value;
 }
-
 
 // HammerJS hooks
 let hammer = new Hammer.Manager(el.parentElement, {})
@@ -73,10 +70,10 @@ hammer.on('pinchmove', (event) => {
 
     // Calculate delta
     let ds = s - ls;
-    let scalebefore = scale;
+    let scaleBefore = scale;
     scale *= (1 + ds);
     constrain();
-    let change = scale - scalebefore;
+    let change = scale - scaleBefore;
 
     if (scale < 0.2) {
         scale = 0.2;
@@ -92,12 +89,6 @@ hammer.on('pinchmove', (event) => {
     translate.x += tx * (translate.x / (scale * el.clientWidth / 2));
     constrain();
 
-    // allow zoom on fingers
-    // let cx = event.center.x - window.innerWidth / 2;
-    // let cy = event.center.y - window.innerHeight / 2;
-    // translate.y += ty * ((translate.y - cy) / (scale * el.clientHeight / 2));
-    // translate.x += tx * ((translate.x - cx) / (scale * el.clientWidth / 2));
-
     // Update last pos
     ls = s;
 })
@@ -106,19 +97,21 @@ hammer.on('pinchstart', (event) => {
     ls = event.scale;
 })
 
-// Reset the page
-resetPage();
+document.onwheel = (event) => {
+    translate.y -= event.deltaY;
+    constrain();
+}
 
 // Infinite cycle
 function update() {
     // Update transform
     updateElementTransform();
-    constrain()
     requestAnimationFrame(update);
 }
 
 function constrain() {
-    // Constrain
+
+    // Constrain horizontally
     let termx = scale * el.clientWidth / 2;
     if (translate.x + termx < ww / 2) {
         translate.x = ww / 2 - termx
@@ -128,14 +121,17 @@ function constrain() {
         translate.x = -ww / 2 + termx
     }
 
+    // Constrain vertically
     let termy = scale * el.clientHeight / 2;
-    if (translate.y + termy < wh / 2) {
-        translate.y = -termy + wh / 2;
+    let bonus = 100;
+    if (translate.y + termy < wh / 2 - bonus) {
+        translate.y = -termy + wh / 2 - bonus;
     }
     if (translate.y - termy > -wh / 2) {
         translate.y = termy - wh / 2;
     }
 
+    // Constrain scale
     if (el.clientWidth * scale < ww) {
         scale = ww / el.clientWidth;
     }

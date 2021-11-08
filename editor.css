@@ -25,3 +25,27 @@ html, body {
     width: 768px;
     height: 1024px;
 }
+
+#toolbar {
+    position: fixed;
+    width: 250px;
+    height: 50px;
+    background-color: #000000AA;
+    left: 50%;
+    bottom: 25px;
+    transform: translate(-125px, 0px)
+}
+
+@media screen and (min-width: 500px) {
+    #toolbar {
+        width: 350px;
+        transform: translate(-175px, 0px)
+    }
+}
+
+@media screen and (min-width: 900px) {
+    #toolbar {
+        width: 400px;
+        transform: translate(-200px, 0px)
+    }
+}
