@@ -5,9 +5,12 @@ let ls;
 let x;
 let y;
 let s;
+let ww = Math.min(window.innerWidth, 768);
+let wh = window.innerHeight;
 
-let translate = { x: 0, y: 0 };
-let scale = 1;
+let translate = { x: 0, y: el.clientHeight };
+let scale = ww / el.clientWidth;
+constrain();
 
 function resetPage() {
 
@@ -116,17 +119,25 @@ function update() {
 
 function constrain() {
     // Constrain
-    let term = scale * el.clientWidth / 2;
-    if (translate.x + term < window.innerWidth / 2) {
-        translate.x = window.innerWidth / 2 - term
+    let termx = scale * el.clientWidth / 2;
+    if (translate.x + termx < ww / 2) {
+        translate.x = ww / 2 - termx
     }
 
-    if (translate.x - term > -window.innerWidth / 2) {
-        translate.x = -window.innerWidth / 2 + term
+    if (translate.x - termx > -ww / 2) {
+        translate.x = -ww / 2 + termx
     }
 
-    if (el.clientWidth * scale < window.innerWidth) {
-        scale = window.innerWidth / el.clientWidth;
+    let termy = scale * el.clientHeight / 2;
+    if (translate.y + termy < wh / 2) {
+        translate.y = -termy + wh / 2;
+    }
+    if (translate.y - termy > -wh / 2) {
+        translate.y = termy - wh / 2;
+    }
+
+    if (el.clientWidth * scale < ww) {
+        scale = ww / el.clientWidth;
     }
 }
 
