@@ -1,0 +1,27 @@
+html, body {
+    width: 100%;
+    height: 100vh;
+    padding: 0;
+    overflow: none;
+}
+
+/* Page list */
+#page-list {
+    position: fixed;
+    display: block;
+    left: 0;
+    top: 0;
+}
+
+/* Page Styles */
+.page {
+    display: block;
+    border: 2px solid #AAF;
+    margin: 10px;
+    background-image: url("page.png");
+    background-repeat: no-repeat;
+    background-size: contain;
+    /* Placeholder sizes */
+    width: 768px;
+    height: 1024px;
+}
