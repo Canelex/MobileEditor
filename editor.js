@@ -6,11 +6,11 @@ let x;
 let y;
 let s;
 
-let translate = {x: 0, y: 0};
+let translate = { x: 0, y: 0 };
 let scale = 1;
 
 function resetPage() {
-    
+
 }
 
 function updateElementTransform() {
@@ -46,12 +46,13 @@ hammer.on('panmove', (event) => {
     // Store mouse pos
     x = event.center.x;
     y = event.center.y;
-    
+
     // Calculate delta
     let dx = x - lx;
     let dy = y - ly;
     translate.x += dx;
     translate.y += dy;
+    constrain();
 
     // Update last pos
     lx = x;
@@ -71,6 +72,7 @@ hammer.on('pinchmove', (event) => {
     let ds = s - ls;
     let scalebefore = scale;
     scale *= (1 + ds);
+    constrain();
     let change = scale - scalebefore;
 
     if (scale < 0.2) {
@@ -85,7 +87,8 @@ hammer.on('pinchmove', (event) => {
     let tx = el.clientWidth / 2 * change;
     translate.y += ty * (translate.y / (scale * el.clientHeight / 2));
     translate.x += tx * (translate.x / (scale * el.clientWidth / 2));
-    
+    constrain();
+
     // allow zoom on fingers
     // let cx = event.center.x - window.innerWidth / 2;
     // let cy = event.center.y - window.innerHeight / 2;
@@ -105,7 +108,26 @@ resetPage();
 
 // Infinite cycle
 function update() {
+    // Update transform
     updateElementTransform();
+    constrain()
     requestAnimationFrame(update);
 }
+
+function constrain() {
+    // Constrain
+    let term = scale * el.clientWidth / 2;
+    if (translate.x + term < window.innerWidth / 2) {
+        translate.x = window.innerWidth / 2 - term
+    }
+
+    if (translate.x - term > -window.innerWidth / 2) {
+        translate.x = -window.innerWidth / 2 + term
+    }
+
+    if (el.clientWidth * scale < window.innerWidth) {
+        scale = window.innerWidth / el.clientWidth;
+    }
+}
+
 requestAnimationFrame(update);
