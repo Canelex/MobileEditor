@@ -274,13 +274,19 @@ function setupHammer() {
 
                 break;
             case 'text':
-                c2d.strokeStyle = 'black';
                 c2d.fillStyle = 'black';
                 c2d.font = '50px Arial'
-                let w = Math.max(250, c2d.measureText(an.value).width);
-                c2d.beginPath();
-                c2d.rect(an.x, an.y - 25, w, 60);
-                c2d.stroke();
+
+                // Outline
+                if (an.typing) {
+                    c2d.strokeStyle = 'black';
+                    c2d.lineWidth = 2;
+                    let w = Math.max(250, c2d.measureText(an.value).width);
+                    c2d.beginPath();
+                    c2d.rect(an.x, an.y - 25, w, 60);
+                    c2d.stroke();
+                }
+
                 c2d.fillText(an.value, an.x, an.y + 25);
                 break;
             default:
@@ -506,6 +512,7 @@ function setupTools() {
                     x: pointer.x,
                     y: pointer.y,
                     value: textarea.value,
+                    typing: true
                 }
 
                 // Store the annotation in the current page
@@ -518,8 +525,9 @@ function setupTools() {
                 // Delete after unfocused
                 textarea.onblur = () => {
                     textarea.remove();
+                    newAnnot.typing = false;
                 }
-                
+
                 // Update
                 textarea.oninput = () => {
                     newAnnot.value = textarea.value;
