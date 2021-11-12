@@ -1,8 +1,9 @@
+/* Body */
 html, body {
     width: 100%;
     height: 100vh;
     padding: 0;
-    overflow: none;
+    overflow: hidden;
 }
 
 /* Page list */
@@ -18,34 +19,121 @@ html, body {
     display: block;
     border: 2px solid #AAF;
     margin: 10px;
-    background-image: url("page.png");
     background-repeat: no-repeat;
     background-size: contain;
+    position: relative;
     /* Placeholder sizes */
     width: 768px;
     height: 1024px;
 }
 
+/* Annotation canvas */
+.page-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+}
+
 #toolbar {
     position: fixed;
-    width: 250px;
+    width: 300px;
     height: 50px;
-    background-color: #000000AA;
+    background-color: #000000CC;
     left: 50%;
     bottom: 25px;
-    transform: translate(-125px, 0px)
+    transform: translate(calc(-150px - 25px), 0px);
+    padding: 0 25px;
+    max-width: 100vw;
 }
 
 @media screen and (min-width: 500px) {
     #toolbar {
-        width: 350px;
-        transform: translate(-175px, 0px)
+        width: 400px;
+        transform: translate(-200px, 0px)
     }
 }
 
 @media screen and (min-width: 900px) {
     #toolbar {
-        width: 400px;
-        transform: translate(-200px, 0px)
+        width: 500px;
+        transform: translate(-250px, 0px)
     }
+}
+
+#tools {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tool {
+    color: white;
+    font-size: 30px !important;
+    display: block;
+}
+
+.tool.active {
+    color: #00AAFF;
+}
+
+#load-page {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1000;
+    width: 100%;
+    height: 100vh;
+    background-color: white;
+}
+
+#input-page {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1001;
+    width: 100%;
+    height: 100vh;
+    background-color: white;
+}
+
+#file-input-button {
+    width: 300px !important;
+    height: 50px !important;
+    margin-top: 50vh;
+    margin-left: 50%;
+    transform: translate(-150px, -15px);
+    border-radius: 5px;
+    background-color: #00AAFF;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid #0094df;
+    cursor: pointer;
+}
+
+#loading-bar {
+    width: 300px !important;
+    height: 30px !important;
+    margin-top: 50vh;
+    margin-left: 50%;
+    transform: translate(-150px, -15px);
+}
+
+.ldBar-label {
+    text-align: center;
+}
+
+#loading-bar path.mainline {
+    stroke-width: 5;
+    stroke: #09f;
+    stroke-linecap: round;
+}
+#loading-bar path.baseline {
+    stroke-width: 5;
+    stroke: #f1f2f3;
+    stroke-linecap: round;
 }

@@ -1,140 +1,557 @@
-// Geometry variables
-let el = document.getElementById("page-list")
-let lx;
-let ly;
-let ls;
-let x;
-let y;
-let s;
-let ww = Math.min(window.innerWidth, 768);
-let wh = window.innerHeight;
+// Data
+let formID;
+let officeID;
+let pdfURL;
+let pdfObj;
+let numPages;
+let numPagesLoaded;
+var loadingBar = new ldBar("#loading-bar");
 
-// Transformations
-let translate = { x: 0, y: el.clientHeight };
-let scale = ww / el.clientWidth;
-constrain();
+// UI
+let translate = { x: 0, y: 0 };
+let scale = 1;
 
-function updateElementTransform() {
-    // Offset the page
-    let ew = el.clientWidth;
-    let eh = el.clientHeight;
-    let ww = window.innerWidth;
+// Tools and annotations
+let selectedTool = 0;
+let pages = []; // list of annotations
+let selectedPage = -1;
+let selectedAnnotation = -1;
+
+function loadPDF(url) {
+    /**
+     * Step 1: Load PDFJS object from BLOB
+     * Step 2: For each page, create a "page" div and append it to "pagelist"
+     * Step 3: Append a canvas to each "page" div
+     * Step 4: Render the page contents to each canvas
+     * Step 5: Change background of "page" div to canvas contents
+     * Step 6: Clear canvas and use it for annotations.
+     */
+
+    // Convert blob to URL
+    pdfURL = url;
+    const pageList = document.getElementById('page-list');
+
+    // Load page
+    pdfjsLib.getDocument(url).promise.then((pdf) => {
+
+        // List of promises
+        let promises = [];
+        pdfObj = pdf;
+        numPages = pdf._pdfInfo.numPages;
+        numPagesLoaded = 0;
+
+        // For each page
+        for (let index = 0; index < numPages; index++) {
+            // Create an element
+            let el = document.createElement('div');
+            el.className = 'page'
+            el.setAttribute('data-id', index);
+            pageList.appendChild(el);
+
+            // Empty annotations list for this page
+            pages.push({
+                id: index,
+                needsUpdate: false,
+                annotations: []
+            });
+
+            // Get the promise
+            let promisePage = pdfObj.getPage(index + 1)
+            promises.push(promisePage);
+
+            // When page loads
+            promisePage.then((page) => {
+                // Get viewport
+                let viewport = page.getViewport({ scale: 3 });
+
+                // Create annotation canvas
+                let canvas = document.createElement('canvas');
+                let context = canvas.getContext('2d')
+                canvas.className = 'page-canvas'
+                canvas.setAttribute('data-id', index);
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                el.appendChild(canvas);
+
+                // Update element
+                el.style.width = viewport.width + 'px';
+                el.style.height = viewport.height + 'px';
+
+                // Render the page
+                page.render({
+                    viewport,
+                    canvasContext: context
+                }).promise.then(() => {
+                    // Update background
+                    let val = canvas.toDataURL("image/jpeg")
+                    el.style.backgroundImage = `url(${val}`;
+
+                    // Clear annotation canvas
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Dev
+                    context.fillStyle = 'pink'
+                    context.fillRect(0, 00, 10, 10);
+                });
+
+                // Update loading bar
+                numPagesLoaded++;
+                loadingBar.set(numPagesLoaded / numPages * 100);
+            });
+        }
+
+        Promise.all(promises).then(res => {
+
+            // Setup hammer
+            setupHammer();
+
+            // Setup toolbar
+            setupToolbar();
+
+            // Reveal page
+            setInterval(() => {
+                $("#load-page").remove();
+            }, 1000)
+        });
+    });
+}
+
+function savePDF() {
+
+    // Translation functions
+    let downloadBlob = function (data, fileName, mimeType) {
+        var blob, url;
+        blob = new Blob([data], {
+            type: mimeType
+        });
+        url = window.URL.createObjectURL(blob);
+        downloadURL(url, fileName);
+        setTimeout(function () {
+            return window.URL.revokeObjectURL(url);
+        }, 1000);
+    };
+
+    let downloadURL = function (data, fileName) {
+        var a;
+        a = document.createElement('a');
+        a.href = data;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.style = 'display: none';
+        a.click();
+        a.remove();
+    };
+
+    // Save
+    PDFLib.PDFDocument.load(pdfURL, { ignoreEncryption: true }).then(pdf => {
+
+        const url = 'https://pdf-lib.js.org/assets/small_mario.png'
+        fetch(url).then(res => {
+            res.arrayBuffer().then(buffer => {
+                pdf.embedPng(buffer).then((img) => {
+                    let page = pdf.getPages()[0];
+                    page.drawImage(img, {
+                        x: 0,
+                        y: 0,
+                        width: img.width,
+                        height: img.height,
+                    })
+                    // Save the pdf
+                    pdf.save().then(blob => {
+                        downloadBlob(blob, 'file.pdf', 'application/octet-stream')
+                    })
+                })
+            })
+        })
+    })
+}
+
+function setupHammer() {
+
+    // Geometry variables
+    let el = document.getElementById("page-list")
+    let lx;
+    let ly;
+    let ls;
+    let x;
+    let y;
+    let s;
+    let ww = Math.min(window.innerWidth, 768);
     let wh = window.innerHeight;
 
-    // Update the fixed position
-    el.style.left = ((ww - ew) / 2) + 'px';
-    el.style.top = ((wh - eh) / 2) + 'px'
-
-    // Concat string
-    let value = [
-        `translate3d(${translate.x}px, ${translate.y}px, 0px)`,
-        `scale(${scale}, ${scale})`
-    ].join(" ")
-
-    // Update position on screen
-    el.style.transform = value;
-    el.style.mozTransform = value;
-    el.style.webkitTransform = value;
-}
-
-// HammerJS hooks
-let hammer = new Hammer.Manager(el.parentElement, {})
-hammer.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
-hammer.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith(hammer.get('pan'));
-
-hammer.on('panmove', (event) => {
-    // Store mouse pos
-    x = event.center.x;
-    y = event.center.y;
-
-    // Calculate delta
-    let dx = x - lx;
-    let dy = y - ly;
-    translate.x += dx;
-    translate.y += dy;
+    // Transformations
+    translate = { x: 0, y: el.clientHeight };
+    scale = ww / el.clientWidth;
     constrain();
 
-    // Update last pos
-    lx = x;
-    ly = y;
-});
+    function updateElementTransform() {
+        // Offset the page
+        let ew = el.clientWidth;
+        let eh = el.clientHeight;
+        let ww = window.innerWidth;
+        let wh = window.innerHeight;
 
-hammer.on('panstart', (event) => {
-    lx = event.center.x;
-    ly = event.center.y;
-})
+        // Update the fixed position
+        el.style.left = ((ww - ew) / 2) + 'px';
+        el.style.top = ((wh - eh) / 2) + 'px'
 
-hammer.on('pinchmove', (event) => {
-    // Store scale pos
-    s = event.scale;
+        // Concat string
+        let value = [
+            `translate3d(${translate.x}px, ${translate.y}px, 0px)`,
+            `scale(${scale}, ${scale})`
+        ].join(" ")
 
-    // Calculate delta
-    let ds = s - ls;
-    let scaleBefore = scale;
-    scale *= (1 + ds);
-    constrain();
-    let change = scale - scaleBefore;
-
-    if (scale < 0.2) {
-        scale = 0.2;
-    }
-    if (scale > 5) {
-        scale = 5;
+        // Update position on screen
+        el.style.transform = value;
+        el.style.mozTransform = value;
+        el.style.webkitTransform = value;
     }
 
-    // Translate too
-    let ty = el.clientHeight / 2 * change;
-    let tx = el.clientWidth / 2 * change;
-    translate.y += ty * (translate.y / (scale * el.clientHeight / 2));
-    translate.x += tx * (translate.x / (scale * el.clientWidth / 2));
-    constrain();
+    function update() {
+        // Update transform
+        updateElementTransform();
 
-    // Update last pos
-    ls = s;
-})
+        // For each page
+        for (let pi = 0; pi < pages.length; pi++) {
+            // Render the annotations
+            let page = pages[pi];
 
-hammer.on('pinchstart', (event) => {
-    ls = event.scale;
-})
+            // Page needs update?
+            if (page && page.needsUpdate) {
+                // Get the canvas
+                let canvasEl = $(`canvas[data-id=${pi}]`);
 
-document.onwheel = (event) => {
-    translate.y -= event.deltaY;
-    constrain();
-}
+                // Verify we have canvas
+                if (canvasEl.length == 0) {
+                    console.warn('Could not find canvas for page', pi)
+                    continue;
+                }
 
-// Infinite cycle
-function update() {
-    // Update transform
-    updateElementTransform();
+                // Clear canvas
+                let canvas = canvasEl[0];
+                let context = canvas.getContext('2d')
+                context.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Render the annotation
+                for (let an of page.annotations) {
+                    renderAnnotation(canvas, an)
+                }
+
+                page.needsUpdate = false;
+            }
+        }
+
+        requestAnimationFrame(update);
+    }
+
+    function renderAnnotation(canvas, an) {
+        // Get context
+        let c2d = canvas.getContext('2d');
+
+        switch (an.type) {
+            case 'line':
+                // Skip if too short
+                let length = an.xs.length;
+                if (length == 0) {
+                    return;
+                }
+                if (length == 1) {
+                    c2d.fillStyle = 'black';
+                    c2d.fillRect(an.xs[0] - 3, an.ys[0] - 3, 6, 6)
+                    return;
+                }
+
+                // Render it
+                c2d.strokeStyle = 'black';
+                c2d.lineWidth = 5;
+                c2d.beginPath();
+                c2d.moveTo(an.xs[0], an.ys[0]);
+                for (let i = 0; i < length; i++) {
+                    c2d.lineTo(an.xs[i], an.ys[i]);
+                }
+                c2d.stroke();
+
+                break;
+            default:
+            //I don't know how to render this
+        }
+    }
+
+    function constrain() {
+
+        // Constrain horizontally
+        let termx = scale * el.clientWidth / 2;
+        if (translate.x + termx < ww / 2) {
+            translate.x = ww / 2 - termx
+        }
+
+        if (translate.x - termx > -ww / 2) {
+            translate.x = -ww / 2 + termx
+        }
+
+        // Constrain vertically
+        let termy = scale * el.clientHeight / 2;
+        let bonus = 100;
+        if (translate.y + termy < wh / 2 - bonus) {
+            translate.y = -termy + wh / 2 - bonus;
+        }
+        if (translate.y - termy > -wh / 2) {
+            translate.y = termy - wh / 2;
+        }
+
+        // Constrain scale
+        if (el.clientWidth * scale < ww) {
+            scale = ww / el.clientWidth;
+        }
+    }
+
+    // HammerJS hooks
+    let hammer = new Hammer.Manager(el.parentElement, {})
+    hammer.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
+    hammer.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith(hammer.get('pan'));
+
+    hammer.on('panmove', (event) => {
+        // Can only move on hand tool
+        if (selectedTool != 0) {
+            return;
+        }
+
+        // Store mouse pos
+        x = event.center.x;
+        y = event.center.y;
+
+        // Calculate delta
+        let dx = x - lx;
+        let dy = y - ly;
+        translate.x += dx;
+        translate.y += dy;
+        constrain();
+
+        // Update last pos
+        lx = x;
+        ly = y;
+    });
+
+    hammer.on('panstart', (event) => {
+        lx = event.center.x;
+        ly = event.center.y;
+    })
+
+    hammer.on('pinchmove', (event) => {
+        // Can only scale on hand tool
+        if (selectedTool != 0) {
+            return;
+        }
+
+        // Store scale pos
+        s = event.scale;
+
+        // Calculate delta
+        let ds = s - ls;
+        let scaleBefore = scale;
+        scale *= (1 + ds);
+        constrain();
+        let change = scale - scaleBefore;
+
+        if (scale < 0) {
+            scale = 0;
+        }
+        if (scale > 5) {
+            scale = 5;
+        }
+
+        // Translate too
+        let ty = el.clientHeight / 2 * change;
+        let tx = el.clientWidth / 2 * change;
+        translate.y += ty * (translate.y / (scale * el.clientHeight / 2));
+        translate.x += tx * (translate.x / (scale * el.clientWidth / 2));
+        constrain();
+
+        // Update last pos
+        ls = s;
+    })
+
+    hammer.on('pinchstart', (event) => {
+        ls = event.scale;
+    })
+
+    document.onwheel = (event) => {
+        translate.y -= event.deltaY;
+        constrain();
+    }
+
     requestAnimationFrame(update);
 }
 
-function constrain() {
+function selectTool(id) {
 
-    // Constrain horizontally
-    let termx = scale * el.clientWidth / 2;
-    if (translate.x + termx < ww / 2) {
-        translate.x = ww / 2 - termx
-    }
-
-    if (translate.x - termx > -ww / 2) {
-        translate.x = -ww / 2 + termx
+    switch (id) {
+        case 4: // Save
+            selectedTool = 0;
+            savePDF();
+            return;
     }
 
-    // Constrain vertically
-    let termy = scale * el.clientHeight / 2;
-    let bonus = 100;
-    if (translate.y + termy < wh / 2 - bonus) {
-        translate.y = -termy + wh / 2 - bonus;
-    }
-    if (translate.y - termy > -wh / 2) {
-        translate.y = termy - wh / 2;
-    }
-
-    // Constrain scale
-    if (el.clientWidth * scale < ww) {
-        scale = ww / el.clientWidth;
-    }
+    // Select tool
+    selectedTool = id;
+    $(`.tool[data-tool=${selectedTool}]`).addClass('active')
 }
 
-requestAnimationFrame(update);
+function setupToolbar() {
+
+    $('.tool').click((e) => {
+        // Toggle CSS
+        let target = $(e.target);
+        $('.tool').removeClass('active');
+
+        // Get index
+        let id = target.data('tool');
+        selectTool(id);
+    });
+
+    // Default tool is hand
+    selectTool(0);
+
+    // Setup tools
+    setupTools();
+}
+
+function setupTools() {
+    let drag = false;
+
+    function onMouseDown(e) {
+        drag = true;
+
+        // Transform it
+        let canvas = $(e.target);
+        let id = parseInt(canvas.data('id'))
+
+        switch (selectedTool) {
+            case 1: // Line tool
+
+                // Create a new line annotation
+                let newAnnot = {
+                    type: 'line',
+                    page: id,
+                    xs: [],
+                    ys: []
+                }
+
+                // Store the annotation
+                pages[id].annotations.push(newAnnot);
+
+                // Select the annotation & page
+                selectedPage = id;
+                selectedAnnotation = pages[id].annotations.length - 1;
+                onMouseMove(e); // triger one move
+                break;
+
+            case 3: // Erase tool
+                onMouseMove(e); // triger one move
+                break;
+        }
+
+    }
+
+    function onMouseUp(e) {
+        drag = false;
+        selectedAnnotation = -1;
+        selectedPage = -1;
+    }
+
+    function onMouseMove(e) {
+
+        if (!drag) {
+            return;
+        }
+
+        // Get position on page
+        let pageX = e.pageX;
+        let pageY = e.pageY;
+        if (e.touches) { // It's on mobile!
+            let touch = e.touches[0];
+            pageX = touch.pageX;
+            pageY = touch.pageY;
+        }
+
+        // Transform it
+        let canvas = $(e.target);
+        let id = parseInt(canvas.data('id'));
+        let bb = canvas[0].getBoundingClientRect();
+        let ratio = canvas[0].width / bb.width;
+        let x = (pageX - bb.left) * ratio;
+        let y = (pageY - bb.top) * ratio;
+
+        // Handle tools
+        switch (selectedTool) {
+            case 1: // Line tool
+                if (selectedAnnotation >= 0 && selectedPage == id) { // Selecting an annotation
+                    let page = pages[selectedPage];
+                    let annot = page.annotations[selectedAnnotation];
+                    let xs = annot.xs;
+                    let ys = annot.ys;
+                    let maxDist = 1; // 7 pixels min distance
+                    let dt = maxDist;
+
+                    // Measure distance to prev point
+                    if (xs.length != 0) {
+                        let px = xs[xs.length - 1];
+                        let py = ys[ys.length - 1];
+                        let dx = px - x;
+                        let dy = py - y;
+                        dt = Math.sqrt(dx * dx + dy * dy);
+                    }
+
+                    // Must be at least 10 pixels away from prev point (reduce lag)
+                    if (dt >= maxDist) {
+                        xs.push(x);
+                        ys.push(y);
+                        page.needsUpdate = true;
+                    }
+
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                break;
+
+            case 3: // Eraser tool
+                let annotations = pages[id].annotations;
+
+                // Filter all annotations that are close
+                annotations = annotations.filter((an) => {
+                    for (let i = 0; i < an.xs.length; i++) {
+                        let ax = an.xs[i];
+                        let ay = an.ys[i];
+                        let dx = ax - x;
+                        let dy = ay - y;
+                        let dt = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dt <= 25) { // within 25 pixels
+                            return false;
+                        }
+                    }
+
+                    return true; // not deleted
+                });
+
+                if (annotations.length != pages[id].annotations) {
+                    pages[id].annotations = annotations;
+                    pages[id].needsUpdate = true;
+                }
+
+                break;
+        }
+    }
+
+    $(document).on('mousedown', '.page-canvas', onMouseDown)
+
+    $(document).on('mouseup', '.page-canvas', onMouseUp)
+
+    $(document).on('mousemove', '.page-canvas', onMouseMove)
+
+    $(document).on('touchstart', '.page-canvas', onMouseDown)
+
+    $(document).on('touchend', '.page-canvas', onMouseUp)
+
+    $(document).on('touchmove', '.page-canvas', onMouseMove)
+}

@@ -1,25 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
     <link href="editor.css" rel="stylesheet">
+    <link href="lib/font-awesome-4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="lib/loading-bar.min.css" rel="stylesheet">
     <title>Mobile PDF Editor</title>
 </head>
+
 <body>
+    <!-- File Input -->
+    <div id="input-page">
+        <label for="file-input" id="file-input-button">Select a PDF File</label>
+        <input type="file" id="file-input" accept="application/pdf" style="display: none;">
+    </div>
+    <!-- Loading Page -->
+    <div id="load-page">
+        <div id="loading-bar"></div>
+    </div>
     <!-- Page List -->
     <div id="page-list">
         <!-- Pages -->
-        <div class="page" id="page-1"></div>
-        <div class="page" id="page-2"></div>
-        <div class="page" id="page-3"></div>
     </div>
     <!-- Toolbar -->
     <div id="toolbar">
-        
+        <div id="tools">
+            <i id="tool-0" class="fa fa-arrows tool" data-tool="0" aria-hidden="true"></i>
+            <i id="tool-1" class="fa fa-pencil tool" data-tool="1" aria-hidden="true"></i>
+            <i id="tool-2" class="fa fa-font tool" data-tool="2" aria-hidden="true"></i>
+            <i id="tool-3" class="fa fa-eraser tool" data-tool="3" aria-hidden="true"></i>
+            <i id="tool-4" class="fa fa-check-circle tool" data-tool="4" style="color: #00FFAA" aria-hidden="true"></i>
+        </div>
     </div>
+    <script src="lib/jquery.min.js"></script>
+    <script src="lib/pdf.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
     <script src="lib/hammer.min.js"></script>
+    <script src="lib/loading-bar.min.js"></script>
     <script src="editor.js"></script>
+    <script>
+        // Upload file
+        $("#file-input").on('change', (e) => {
+            // Cancel default event
+            e.preventDefault();
+
+            // Get file
+            const file = e.target.files[0];
+
+            // No file?
+            if (!file) {
+                return;
+            }
+
+            let reader = new FileReader();
+            reader.addEventListener('load', (event) => {
+                $("#input-page").remove();
+                loadPDF(event.target.result);
+            });
+            reader.readAsDataURL(file);
+        })
+    </script>
 </body>
+
 </html>
