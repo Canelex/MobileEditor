@@ -41,7 +41,7 @@ html, body {
     height: 50px;
     background-color: #000000CC;
     left: 50%;
-    bottom: 25px;
+    bottom: 0px;
     transform: translate(calc(-150px - 25px), 0px);
     padding: 0 25px;
     max-width: 100vw;
