@@ -36,33 +36,22 @@ html, body {
 }
 
 #toolbar {
+    box-sizing: border-box;
     position: fixed;
-    width: 300px;
+    width: 100%;
     height: 50px;
     background-color: #000000CC;
-    left: 50%;
+    left: 0px;
     bottom: 0px;
-    transform: translate(calc(-150px - 25px), 0px);
     padding: 0 25px;
     max-width: 100vw;
-}
-
-@media screen and (min-width: 500px) {
-    #toolbar {
-        width: 400px;
-        transform: translate(-200px, 0px)
-    }
-}
-
-@media screen and (min-width: 900px) {
-    #toolbar {
-        width: 500px;
-        transform: translate(-250px, 0px)
-    }
+    display: flex;
+    justify-content: center;
 }
 
 #tools {
-    width: 100%;
+    max-width: 768px;
+    width: 100vw;
     height: 100%;
     display: flex;
     justify-content: space-between;
