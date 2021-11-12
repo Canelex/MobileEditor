@@ -184,6 +184,17 @@ function setupHammer() {
     scale = ww / el.clientWidth;
     constrain();
 
+    function disableImgEventHandlers() {
+        var events = ['onclick', 'onmousedown', 'onmousemove', 'onmouseout', 'onmouseover',
+            'onmouseup', 'ondblclick', 'onfocus', 'onblur'];
+
+        events.forEach(function (event) {
+            el[event] = function () {
+                return false;
+            };
+        });
+    };
+
     function updateElementTransform() {
         // Offset the page
         let ew = el.clientWidth;
@@ -323,11 +334,14 @@ function setupHammer() {
     }
 
     // HammerJS hooks
+    disableImgEventHandlers();
     let hammer = new Hammer.Manager(el.parentElement, {})
     hammer.add(new Hammer.Pan({ threshold: 0, pointers: 0 }));
     hammer.add(new Hammer.Pinch({ threshold: 0 })).recognizeWith(hammer.get('pan'));
 
     hammer.on('panmove', (event) => {
+        event.preventDefault();
+
         // Can only move on hand tool
         if (selectedTool != 0) {
             return;
@@ -347,14 +361,19 @@ function setupHammer() {
         // Update last pos
         lx = x;
         ly = y;
+
+        return false;
     });
 
     hammer.on('panstart', (event) => {
+        event.preventDefault();
         lx = event.center.x;
         ly = event.center.y;
+        return false;
     })
 
     hammer.on('pinchmove', (event) => {
+        event.preventDefault();
         // Can only scale on hand tool
         if (selectedTool != 0) {
             return;
@@ -386,10 +405,14 @@ function setupHammer() {
 
         // Update last pos
         ls = s;
+
+        return false;
     })
 
     hammer.on('pinchstart', (event) => {
+        event.preventDefault();
         ls = event.scale;
+        return false;
     })
 
     document.onwheel = (event) => {
@@ -536,13 +559,14 @@ function setupTools() {
                     pages[pointer.id].needsUpdate = true;
                 }
 
-                e.preventDefault();
                 break;
             case 3: // Erase tool
                 onMouseMove(e); // Call event for same position (allows erase tap)
                 break;
         }
 
+        e.preventDefault();
+        return false;
     }
 
     function onMouseUp(e) {
@@ -557,6 +581,9 @@ function setupTools() {
                 // Nothing
                 break;
         }
+
+        e.preventDefault();
+        return false;
     }
 
     function onMouseMove(e) {
@@ -625,6 +652,9 @@ function setupTools() {
 
                 break;
         }
+
+        e.preventDefault();
+        return false;
     }
 
     $(document).on('mousedown', '.page-canvas', onMouseDown)

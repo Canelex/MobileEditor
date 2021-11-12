@@ -4,6 +4,8 @@ html, body {
     height: 100vh;
     padding: 0;
     overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none
 }
 
 /* Page list */
