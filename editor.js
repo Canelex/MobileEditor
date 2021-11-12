@@ -14,8 +14,8 @@ let scale = 1;
 // Tools and annotations
 let selectedTool = 0;
 let pages = []; // list of annotations
-let selectedPage = -1;
-let selectedAnnotation = -1;
+let selectedPage;
+let selectedAnnotation;
 
 function loadPDF(url) {
     /**
@@ -419,53 +419,8 @@ function setupToolbar() {
 function setupTools() {
     let drag = false;
 
-    function onMouseDown(e) {
-        drag = true;
-
-        // Transform it
-        let canvas = $(e.target);
-        let id = parseInt(canvas.data('id'))
-
-        switch (selectedTool) {
-            case 1: // Line tool
-
-                // Create a new line annotation
-                let newAnnot = {
-                    type: 'line',
-                    page: id,
-                    xs: [],
-                    ys: []
-                }
-
-                // Store the annotation
-                pages[id].annotations.push(newAnnot);
-
-                // Select the annotation & page
-                selectedPage = id;
-                selectedAnnotation = pages[id].annotations.length - 1;
-                onMouseMove(e); // triger one move
-                break;
-
-            case 3: // Erase tool
-                onMouseMove(e); // triger one move
-                break;
-        }
-
-    }
-
-    function onMouseUp(e) {
-        drag = false;
-        selectedAnnotation = -1;
-        selectedPage = -1;
-    }
-
-    function onMouseMove(e) {
-
-        if (!drag) {
-            return;
-        }
-
-        // Get position on page
+    function getPointerPos(e) {
+        // Get pageX and pageY
         let pageX = e.pageX;
         let pageY = e.pageY;
         if (e.touches) { // It's on mobile!
@@ -474,56 +429,89 @@ function setupTools() {
             pageY = touch.pageY;
         }
 
-        // Transform it
-        let canvas = $(e.target);
-        let id = parseInt(canvas.data('id'));
-        let bb = canvas[0].getBoundingClientRect();
-        let ratio = canvas[0].width / bb.width;
+        // Convert it to x and y
+        let elCanvas = $(e.target);
+        let canvas = elCanvas[0];
+        let id = parseInt(elCanvas.data('id'));
+        let bb = canvas.getBoundingClientRect();
+        let ratio = canvas.width / bb.width;
         let x = (pageX - bb.left) * ratio;
         let y = (pageY - bb.top) * ratio;
+        return {
+            x, y, id, canvas
+        }
+    }
+
+    function onMouseDown(e) {
+        drag = true;
+
+        // Transform it
+        let pointer = getPointerPos(e);
+
+        switch (selectedTool) {
+            case 1: // Line tool
+
+                // Create a new line annotation
+                let newAnnot = {
+                    type: 'line',
+                    page: pointer.id,
+                    xs: [pointer.x],
+                    ys: [pointer.y]
+                }
+
+                // Store the annotation in the current page
+                pages[pointer.id].annotations.push(newAnnot);
+
+                // Select the annotation & page
+                selectedPage = pages[pointer.id];
+                selectedAnnotation = selectedPage.annotations[selectedPage.annotations.length - 1];
+                break;
+               
+            case 3: // Erase tool
+                onMouseMove(e); // Call event for same position (allows erase tap)
+                break;
+        }
+
+    }
+
+    function onMouseUp(e) {
+        drag = false;
+        selectedAnnotation = null;
+        selectedPage = null;
+    }
+
+    function onMouseMove(e) {
+        // If they're not dragging, its a hover
+        if (!drag) {
+            return;
+        }
+
+        // Get pointer position
+        let pointer = getPointerPos(e);
 
         // Handle tools
         switch (selectedTool) {
             case 1: // Line tool
-                if (selectedAnnotation >= 0 && selectedPage == id) { // Selecting an annotation
-                    let page = pages[selectedPage];
-                    let annot = page.annotations[selectedAnnotation];
-                    let xs = annot.xs;
-                    let ys = annot.ys;
-                    let maxDist = 1; // 7 pixels min distance
-                    let dt = maxDist;
-
-                    // Measure distance to prev point
-                    if (xs.length != 0) {
-                        let px = xs[xs.length - 1];
-                        let py = ys[ys.length - 1];
-                        let dx = px - x;
-                        let dy = py - y;
-                        dt = Math.sqrt(dx * dx + dy * dy);
-                    }
-
-                    // Must be at least 10 pixels away from prev point (reduce lag)
-                    if (dt >= maxDist) {
-                        xs.push(x);
-                        ys.push(y);
-                        page.needsUpdate = true;
-                    }
-
-                    e.preventDefault();
-                    e.stopPropagation();
+                if (selectedAnnotation && selectedPage && selectedPage.id == pointer.id) { //User is selecting an annotation
+                    let xs = selectedAnnotation.xs;
+                    let ys = selectedAnnotation.ys;
+                    xs.push(pointer.x);
+                    ys.push(pointer.y);
+                    selectedPage.needsUpdate = true;
                 }
                 break;
 
             case 3: // Eraser tool
-                let annotations = pages[id].annotations;
+                let page = pages[pointer.id]
+                let annotations = page.annotations;
 
                 // Filter all annotations that are close
                 annotations = annotations.filter((an) => {
                     for (let i = 0; i < an.xs.length; i++) {
                         let ax = an.xs[i];
                         let ay = an.ys[i];
-                        let dx = ax - x;
-                        let dy = ay - y;
+                        let dx = ax - pointer.x;
+                        let dy = ay - pointer.y;
                         let dt = Math.sqrt(dx * dx + dy * dy);
 
                         if (dt <= 25) { // within 25 pixels
@@ -534,9 +522,11 @@ function setupTools() {
                     return true; // not deleted
                 });
 
-                if (annotations.length != pages[id].annotations) {
-                    pages[id].annotations = annotations;
-                    pages[id].needsUpdate = true;
+                // Number of annotations changed
+                if (annotations.length != page.annotations.length) {
+                    // Update!
+                    page.annotations = annotations;
+                    page.needsUpdate = true;
                 }
 
                 break;
