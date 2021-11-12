@@ -491,6 +491,7 @@ function setupTools() {
 
                 // Store the annotation in the current page
                 pages[pointer.id].annotations.push(newAnnot);
+                pages[pointer.id].needsUpdate = true;
 
                 // Select the annotation & page
                 selectedPage = pages[pointer.id];
@@ -526,6 +527,7 @@ function setupTools() {
                 textarea.onblur = () => {
                     textarea.remove();
                     newAnnot.typing = false;
+                    pages[pointer.id].needsUpdate = true;
                 }
 
                 // Update
