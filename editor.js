@@ -234,6 +234,7 @@ function setupHammer() {
 
                 // Render the annotation
                 for (let an of page.annotations) {
+                    console.log('rendering', an.type);
                     renderAnnotation(canvas, an)
                 }
 
@@ -271,6 +272,16 @@ function setupHammer() {
                 }
                 c2d.stroke();
 
+                break;
+            case 'text':
+                c2d.strokeStyle = 'black';
+                c2d.fillStyle = 'black';
+                c2d.font = '50px Arial'
+                let w = Math.max(250, c2d.measureText(an.value).width);
+                c2d.beginPath();
+                c2d.rect(an.x, an.y - 25, w, 60);
+                c2d.stroke();
+                c2d.fillText(an.value, an.x, an.y + 25);
                 break;
             default:
             //I don't know how to render this
@@ -407,6 +418,10 @@ function setupToolbar() {
         // Get index
         let id = target.data('tool');
         selectTool(id);
+
+        // Prevent default
+        e.preventDefault();
+        e.stopPropagation();
     });
 
     // Default tool is hand
@@ -419,7 +434,7 @@ function setupToolbar() {
 function setupTools() {
     let drag = false;
 
-    function getPointerPos(e) {
+    function getRawPos(e) {
         // Get pageX and pageY
         let pageX = e.pageX;
         let pageY = e.pageY;
@@ -428,6 +443,15 @@ function setupTools() {
             pageX = touch.pageX;
             pageY = touch.pageY;
         }
+        return {
+            x: pageX,
+            y: pageY
+        }
+    }
+
+    function getPointerPos(e) {
+        // Get raw position
+        let raw = getRawPos(e);
 
         // Convert it to x and y
         let elCanvas = $(e.target);
@@ -435,8 +459,8 @@ function setupTools() {
         let id = parseInt(elCanvas.data('id'));
         let bb = canvas.getBoundingClientRect();
         let ratio = canvas.width / bb.width;
-        let x = (pageX - bb.left) * ratio;
-        let y = (pageY - bb.top) * ratio;
+        let x = (raw.x - bb.left) * ratio;
+        let y = (raw.y - bb.top) * ratio;
         return {
             x, y, id, canvas
         }
@@ -447,12 +471,12 @@ function setupTools() {
 
         // Transform it
         let pointer = getPointerPos(e);
+        let newAnnot;
 
         switch (selectedTool) {
             case 1: // Line tool
-
                 // Create a new line annotation
-                let newAnnot = {
+                newAnnot = {
                     type: 'line',
                     page: pointer.id,
                     xs: [pointer.x],
@@ -466,7 +490,44 @@ function setupTools() {
                 selectedPage = pages[pointer.id];
                 selectedAnnotation = selectedPage.annotations[selectedPage.annotations.length - 1];
                 break;
-               
+
+            case 2: // Text tool
+
+                // Create a textbox
+                let textarea = document.createElement('textarea');
+                textarea.rows = 1;
+                textarea.id = "textarea"
+                document.body.appendChild(textarea);
+
+                // Create a new text annotation
+                newAnnot = {
+                    type: 'text',
+                    page: pointer.id,
+                    x: pointer.x,
+                    y: pointer.y,
+                    value: textarea.value,
+                }
+
+                // Store the annotation in the current page
+                pages[pointer.id].annotations.push(newAnnot);
+                pages[pointer.id].needsUpdate = true;
+
+                // Focus textbox
+                textarea.focus();
+
+                // Delete after unfocused
+                textarea.onblur = () => {
+                    textarea.remove();
+                }
+                
+                // Update
+                textarea.oninput = () => {
+                    newAnnot.value = textarea.value;
+                    pages[pointer.id].needsUpdate = true;
+                }
+
+                e.preventDefault();
+                break;
             case 3: // Erase tool
                 onMouseMove(e); // Call event for same position (allows erase tap)
                 break;
@@ -475,9 +536,17 @@ function setupTools() {
     }
 
     function onMouseUp(e) {
+
         drag = false;
-        selectedAnnotation = null;
-        selectedPage = null;
+        switch (selectedTool) {
+            case 1: // Line tool
+                selectedAnnotation = null;
+                selectedPage = null;
+                break;
+            case 2:
+                // Nothing
+                break;
+        }
     }
 
     function onMouseMove(e) {
@@ -507,19 +576,34 @@ function setupTools() {
 
                 // Filter all annotations that are close
                 annotations = annotations.filter((an) => {
-                    for (let i = 0; i < an.xs.length; i++) {
-                        let ax = an.xs[i];
-                        let ay = an.ys[i];
-                        let dx = ax - pointer.x;
-                        let dy = ay - pointer.y;
-                        let dt = Math.sqrt(dx * dx + dy * dy);
 
-                        if (dt <= 25) { // within 25 pixels
-                            return false;
-                        }
+                    switch (an.type) {
+                        case 'line':
+                            for (let i = 0; i < an.xs.length; i++) {
+                                let ax = an.xs[i];
+                                let ay = an.ys[i];
+                                let dx = ax - pointer.x;
+                                let dy = ay - pointer.y;
+                                let dt = Math.sqrt(dx * dx + dy * dy);
+
+                                if (dt <= 25) { // within 25 pixels
+                                    return false;
+                                }
+                            }
+
+                            return true; // not deleted
+                        case 'text':
+                            let ax = an.x;
+                            let ay = an.y;
+                            let dx = ax - pointer.x;
+                            let dy = ay - pointer.y;
+                            let dt = Math.sqrt(dx * dx + dy * dy);
+                            return dt > 25; // within 25 px
+                        default:
+                        // Unknown annotation
                     }
 
-                    return true; // not deleted
+
                 });
 
                 // Number of annotations changed

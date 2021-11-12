@@ -126,3 +126,8 @@ html, body {
     stroke: #f1f2f3;
     stroke-linecap: round;
 }
+
+#textarea {
+    position: fixed;
+    top: -100px;
+}
