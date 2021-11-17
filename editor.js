@@ -189,7 +189,7 @@ function savePDF() {
 
                             // Calculate canvas dimensions
                             let minX = page.width * page.scale;
-                            let minY = page.width * page.scale
+                            let minY = page.height * page.scale;
                             let maxX = 0;
                             let maxY = 0;
                             for (let i = 0; i < an.xs.length; i++) {
@@ -200,9 +200,10 @@ function savePDF() {
                                 maxX = Math.max(maxX, x);
                                 maxY = Math.max(maxY, y);
                             }
-                            // Some padding
-                            cnv.width = maxX - minX + 50; // some padding
-                            cnv.height = maxY - minY + 50;
+                            let width = maxX - minX + 50;
+                            let height = maxY - minY + 50;
+                            cnv.width = width;
+                            cnv.height = height;
 
                             // Draw the line
                             // Skip if too short
@@ -211,10 +212,13 @@ function savePDF() {
                                 return;
                             }
 
+                            // Translate
+                            c2d.translate(25, 25);
+
                             // Render a dot if too short
                             if (length == 1) {
                                 c2d.fillStyle = 'black';
-                                c2d.fillRect(an.xs[0] - 3 - minX + 25, an.ys[0] - 3 - minY + 25, 6, 6)
+                                c2d.fillRect(an.xs[0] - minX - 3, an.ys[0] - minX - 3, 6, 6)
                                 return;
                             }
 
@@ -222,9 +226,9 @@ function savePDF() {
                             c2d.strokeStyle = 'black';
                             c2d.lineWidth = 2 * page.scale;
                             c2d.beginPath();
-                            c2d.moveTo(an.xs[0] - minX + 25, an.ys[0] - minY + 25);
+                            c2d.moveTo(an.xs[0] - minX, an.ys[0] - minY);
                             for (let i = 0; i < length; i++) {
-                                c2d.lineTo(an.xs[i] - minX + 25, an.ys[i] - minY + 25);
+                                c2d.lineTo(an.xs[i] - minX, an.ys[i] - minY);
                             }
                             c2d.stroke();
 
@@ -237,8 +241,8 @@ function savePDF() {
                             promise.then(png => {
                                 // Render it
                                 pdfPage.drawImage(png, {
-                                    x: an.xs[0] / page.scale,
-                                    y: page.height - an.ys[0] / page.scale,
+                                    x: (minX - 25) / page.scale,
+                                    y: page.height - (maxY + 25) / page.scale,
                                     width: png.width / page.scale,
                                     height: png.height / page.scale
                                 });
@@ -396,7 +400,7 @@ function setupHammer() {
                     c2d.lineWidth = 2;
                     let w = Math.max(250, c2d.measureText(an.value).width);
                     c2d.beginPath();
-                    c2d.rect(an.x, an.y, w, fontSize);
+                    c2d.rect(an.x, an.y, w, fontSize + 8);
                     c2d.stroke();
                 }
 
@@ -642,6 +646,11 @@ function onMouseDown(e) {
     let pointer = getPointerPos(e);
     let newAnnot;
 
+    if (!pointer || !pointer.id) {
+        e.preventDefault();
+        return;
+    }
+
     switch (selectedTool) {
         case 1: // Line tool
             // Create a new line annotation
@@ -674,7 +683,7 @@ function onMouseDown(e) {
                 type: 'text',
                 page: pointer.id,
                 x: pointer.x,
-                y: pointer.y,
+                y: pointer.y - 15 * pages[pointer.id].scale,
                 value: textarea.value,
                 typing: true
             }

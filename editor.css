@@ -73,6 +73,7 @@ html, body {
     align-items: center;
     justify-content: center;
     color: white;
+    cursor: pointer;
 }
 
 .tool.active {
@@ -81,11 +82,13 @@ html, body {
 
 .tool i {
     font-size: 30px !important;
+    cursor: pointer;
 }
 
 .tool span {
     margin-top: 5px;
     font-size: x-small !important;
+    cursor: pointer;
 }
 
 #load-page {
