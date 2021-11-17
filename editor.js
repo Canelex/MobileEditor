@@ -155,12 +155,14 @@ function savePDF() {
     };
 
     // Save
+    console.info('Loading PDF doc...');
     PDFLib.PDFDocument.load(pdfURL, { ignoreEncryption: true }).then(pdf => {
 
         // Load font before starting PDF
         const helvetica = pdf.embedFont(PDFLib.StandardFonts.Helvetica);
 
         // Once font is loaded
+        console.info('Loading Helvetica font...')
         helvetica.then(font => {
 
             let promises = [];
@@ -176,6 +178,7 @@ function savePDF() {
                     switch (an.type) {
                         case 'text':
                             // Draw text
+                            console.info('- Rendered Text for page ' + i)
                             pdfPage.drawText(an.value, {
                                 x: (an.x / page.scale),
                                 y: page.height - (an.y / page.scale) - 15,
@@ -238,15 +241,20 @@ function savePDF() {
                             promises.push(promise);
 
                             // Once the image is embedded
+                            console.info('- Embedding PNG for page ' + i)
                             promise.then(png => {
                                 // Render it
+                                console.info('- Rendered PNG for page ' + i)
                                 pdfPage.drawImage(png, {
                                     x: (minX - 25) / page.scale,
                                     y: page.height - (maxY + 25) / page.scale,
                                     width: png.width / page.scale,
                                     height: png.height / page.scale
                                 });
+                            }).catch(err => {
+                                console.error('Error embedding PNG: ', err);
                             });
+                            break;
                         default:
                             console.warn("I don't know how to render " + an.type)
                             break;
@@ -260,9 +268,11 @@ function savePDF() {
                 pdf.save().then(blob => {
                     downloadBlob(blob, 'file.pdf', 'application/octet-stream')
                 })
+            }).catch(err => {
+                console.error('Error constructing PDF', err);
             })
-
-
+        }).catch(err => {
+            console.error('Error embedding font Helvetica', err);
         })
     })
 }
@@ -679,7 +689,7 @@ function onMouseDown(e) {
                 type: 'text',
                 page: pointer.id,
                 x: pointer.x,
-                y: pointer.y - 15 * pages[pointer.id].scale,
+                y: pointer.y - 15 * pages[pointer.id].scale / 2,
                 value: textarea.value,
                 typing: true
             }
@@ -697,7 +707,8 @@ function onMouseDown(e) {
                 let sy = sp.y / window.innerHeight;
                 // More than 30% down
                 if (sy > 0.3) {
-                    translate.y -= (sy - 0.3) * window.innerHeight;
+                    // Move to 25% (little bit of wiggle room)
+                    translate.y -= (sy - 0.25) * window.innerHeight;
                 }
 
             }
