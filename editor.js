@@ -646,11 +646,6 @@ function onMouseDown(e) {
     let pointer = getPointerPos(e);
     let newAnnot;
 
-    if (!pointer || !pointer.id) {
-        e.preventDefault();
-        return;
-    }
-
     switch (selectedTool) {
         case 1: // Line tool
             // Create a new line annotation
