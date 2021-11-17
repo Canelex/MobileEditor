@@ -16,6 +16,9 @@ let selectedTool = 0;
 let pages = []; // list of annotations
 let selectedPage;
 let selectedAnnotation;
+let drag = false;
+
+/** PDFJS */
 
 function loadPDF(url) {
     /**
@@ -37,7 +40,7 @@ function loadPDF(url) {
         // List of promises
         let promises = [];
         pdfObj = pdf;
-        numPages = pdf._pdfInfo.numPages;
+        numPages = Math.min(5, pdf._pdfInfo.numPages);
         numPagesLoaded = 0;
 
         // For each page
@@ -62,7 +65,8 @@ function loadPDF(url) {
             // When page loads
             promisePage.then((page) => {
                 // Get viewport
-                let viewport = page.getViewport({ scale: 3 });
+                let vpscale = getRecommendedViewport(page);
+                let viewport = page.getViewport({ scale: vpscale });
 
                 // Create annotation canvas
                 let canvas = document.createElement('canvas');
@@ -92,11 +96,15 @@ function loadPDF(url) {
                     // Dev
                     context.fillStyle = 'pink'
                     context.fillRect(0, 00, 10, 10);
+                }).catch(err => {
+                    confirm('error render page' + JSON.stringify(err));
                 });
 
                 // Update loading bar
                 numPagesLoaded++;
                 loadingBar.set(numPagesLoaded / numPages * 100);
+            }).catch(err => {
+                confirm('error load page' + JSON.stringify(err));
             });
         }
 
@@ -165,6 +173,28 @@ function savePDF() {
         })
     })
 }
+
+function getRecommendedViewport(page) {
+    // Maximum height of any canvas
+    const MAX_HEIGHT_PX = 2400
+
+    // Get page info
+    let pageInfo = page._pageInfo;
+
+    // Page view is valid
+    if (pageInfo && pageInfo.view && pageInfo.view.length == 4) {
+        // Get page height
+        let pageHeight = pageInfo.view[3];
+        
+        // Calculate ratio for maximum height
+        return Math.floor(MAX_HEIGHT_PX / pageHeight)
+    }
+
+    // Default page viewport
+    return 2.0;
+}
+
+/** HammerJS */
 
 function setupHammer() {
 
@@ -423,6 +453,8 @@ function setupHammer() {
     requestAnimationFrame(update);
 }
 
+/** Tools */
+
 function selectTool(id) {
 
     switch (id) {
@@ -453,210 +485,6 @@ function setupToolbar() {
         e.stopPropagation();
     });
 
-    // Default tool is hand
-    selectTool(0);
-
-    // Setup tools
-    setupTools();
-}
-
-function setupTools() {
-    let drag = false;
-
-    function getRawPos(e) {
-        // Get pageX and pageY
-        let pageX = e.pageX;
-        let pageY = e.pageY;
-        if (e.touches) { // It's on mobile!
-            let touch = e.touches[0];
-            pageX = touch.pageX;
-            pageY = touch.pageY;
-        }
-        return {
-            x: pageX,
-            y: pageY
-        }
-    }
-
-    function getPointerPos(e) {
-        // Get raw position
-        let raw = getRawPos(e);
-
-        // Convert it to x and y
-        let elCanvas = $(e.target);
-        let canvas = elCanvas[0];
-        let id = parseInt(elCanvas.data('id'));
-        let bb = canvas.getBoundingClientRect();
-        let ratio = canvas.width / bb.width;
-        let x = (raw.x - bb.left) * ratio;
-        let y = (raw.y - bb.top) * ratio;
-        return {
-            x, y, id, canvas
-        }
-    }
-
-    function onMouseDown(e) {
-        drag = true;
-
-        // Transform it
-        let pointer = getPointerPos(e);
-        let newAnnot;
-
-        switch (selectedTool) {
-            case 1: // Line tool
-                // Create a new line annotation
-                newAnnot = {
-                    type: 'line',
-                    page: pointer.id,
-                    xs: [pointer.x],
-                    ys: [pointer.y]
-                }
-
-                // Store the annotation in the current page
-                pages[pointer.id].annotations.push(newAnnot);
-                pages[pointer.id].needsUpdate = true;
-
-                // Select the annotation & page
-                selectedPage = pages[pointer.id];
-                selectedAnnotation = selectedPage.annotations[selectedPage.annotations.length - 1];
-                break;
-
-            case 2: // Text tool
-
-                // Create a textbox
-                let textarea = document.createElement('textarea');
-                textarea.rows = 1;
-                textarea.id = "textarea"
-                document.body.appendChild(textarea);
-
-                // Create a new text annotation
-                newAnnot = {
-                    type: 'text',
-                    page: pointer.id,
-                    x: pointer.x,
-                    y: pointer.y,
-                    value: textarea.value,
-                    typing: true
-                }
-
-                // Store the annotation in the current page
-                pages[pointer.id].annotations.push(newAnnot);
-                pages[pointer.id].needsUpdate = true;
-
-                // Focus textbox
-                textarea.focus();
-
-                // Delete after unfocused
-                textarea.onblur = () => {
-                    textarea.remove();
-                    newAnnot.typing = false;
-                    pages[pointer.id].needsUpdate = true;
-                }
-
-                // Update
-                textarea.oninput = () => {
-                    newAnnot.value = textarea.value;
-                    pages[pointer.id].needsUpdate = true;
-                }
-
-                break;
-            case 3: // Erase tool
-                onMouseMove(e); // Call event for same position (allows erase tap)
-                break;
-        }
-
-        e.preventDefault();
-        return false;
-    }
-
-    function onMouseUp(e) {
-
-        drag = false;
-        switch (selectedTool) {
-            case 1: // Line tool
-                selectedAnnotation = null;
-                selectedPage = null;
-                break;
-            case 2:
-                // Nothing
-                break;
-        }
-
-        e.preventDefault();
-        return false;
-    }
-
-    function onMouseMove(e) {
-        // If they're not dragging, its a hover
-        if (!drag) {
-            return;
-        }
-
-        // Get pointer position
-        let pointer = getPointerPos(e);
-
-        // Handle tools
-        switch (selectedTool) {
-            case 1: // Line tool
-                if (selectedAnnotation && selectedPage && selectedPage.id == pointer.id) { //User is selecting an annotation
-                    let xs = selectedAnnotation.xs;
-                    let ys = selectedAnnotation.ys;
-                    xs.push(pointer.x);
-                    ys.push(pointer.y);
-                    selectedPage.needsUpdate = true;
-                }
-                break;
-
-            case 3: // Eraser tool
-                let page = pages[pointer.id]
-                let annotations = page.annotations;
-
-                // Filter all annotations that are close
-                annotations = annotations.filter((an) => {
-
-                    switch (an.type) {
-                        case 'line':
-                            for (let i = 0; i < an.xs.length; i++) {
-                                let ax = an.xs[i];
-                                let ay = an.ys[i];
-                                let dx = ax - pointer.x;
-                                let dy = ay - pointer.y;
-                                let dt = Math.sqrt(dx * dx + dy * dy);
-
-                                if (dt <= 25) { // within 25 pixels
-                                    return false;
-                                }
-                            }
-
-                            return true; // not deleted
-                        case 'text':
-                            let ax = an.x;
-                            let ay = an.y;
-                            let dx = ax - pointer.x;
-                            let dy = ay - pointer.y;
-                            let dt = Math.sqrt(dx * dx + dy * dy);
-                            return dt > 25; // within 25 px
-                        default:
-                        // Unknown annotation
-                    }
-
-
-                });
-
-                // Number of annotations changed
-                if (annotations.length != page.annotations.length) {
-                    // Update!
-                    page.annotations = annotations;
-                    page.needsUpdate = true;
-                }
-
-                break;
-        }
-
-        e.preventDefault();
-        return false;
-    }
-
     $(document).on('mousedown', '.page-canvas', onMouseDown)
 
     $(document).on('mouseup', '.page-canvas', onMouseUp)
@@ -668,4 +496,201 @@ function setupTools() {
     $(document).on('touchend', '.page-canvas', onMouseUp)
 
     $(document).on('touchmove', '.page-canvas', onMouseMove)
+
+    // Default tool is hand
+    selectTool(0);
+}
+
+function getRawPos(e) {
+    // Get pageX and pageY
+    let pageX = e.pageX;
+    let pageY = e.pageY;
+    if (e.touches) { // It's on mobile!
+        let touch = e.touches[0];
+        pageX = touch.pageX;
+        pageY = touch.pageY;
+    }
+    return {
+        x: pageX,
+        y: pageY
+    }
+}
+
+function getPointerPos(e) {
+    // Get raw position
+    let raw = getRawPos(e);
+
+    // Convert it to x and y
+    let elCanvas = $(e.target);
+    let canvas = elCanvas[0];
+    let id = parseInt(elCanvas.data('id'));
+    let bb = canvas.getBoundingClientRect();
+    let ratio = canvas.width / bb.width;
+    let x = (raw.x - bb.left) * ratio;
+    let y = (raw.y - bb.top) * ratio;
+    return {
+        x, y, id, canvas
+    }
+}
+
+function onMouseDown(e) {
+    drag = true;
+
+    // Transform it
+    let pointer = getPointerPos(e);
+    let newAnnot;
+
+    switch (selectedTool) {
+        case 1: // Line tool
+            // Create a new line annotation
+            newAnnot = {
+                type: 'line',
+                page: pointer.id,
+                xs: [pointer.x],
+                ys: [pointer.y]
+            }
+
+            // Store the annotation in the current page
+            pages[pointer.id].annotations.push(newAnnot);
+            pages[pointer.id].needsUpdate = true;
+
+            // Select the annotation & page
+            selectedPage = pages[pointer.id];
+            selectedAnnotation = selectedPage.annotations[selectedPage.annotations.length - 1];
+            break;
+
+        case 2: // Text tool
+
+            // Create a textbox
+            let textarea = document.createElement('textarea');
+            textarea.rows = 1;
+            textarea.id = "textarea"
+            document.body.appendChild(textarea);
+
+            // Create a new text annotation
+            newAnnot = {
+                type: 'text',
+                page: pointer.id,
+                x: pointer.x,
+                y: pointer.y,
+                value: textarea.value,
+                typing: true
+            }
+
+            // Store the annotation in the current page
+            pages[pointer.id].annotations.push(newAnnot);
+            pages[pointer.id].needsUpdate = true;
+
+            // Focus textbox
+            textarea.focus();
+
+            // Delete after unfocused
+            textarea.onblur = () => {
+                textarea.remove();
+                newAnnot.typing = false;
+                pages[pointer.id].needsUpdate = true;
+            }
+
+            // Update
+            textarea.oninput = () => {
+                newAnnot.value = textarea.value;
+                pages[pointer.id].needsUpdate = true;
+            }
+
+            break;
+        case 3: // Erase tool
+            onMouseMove(e); // Call event for same position (allows erase tap)
+            break;
+    }
+
+    e.preventDefault();
+    return false;
+}
+
+function onMouseUp(e) {
+
+    drag = false;
+    switch (selectedTool) {
+        case 1: // Line tool
+            selectedAnnotation = null;
+            selectedPage = null;
+            break;
+        case 2:
+            // Nothing
+            break;
+    }
+
+    e.preventDefault();
+    return false;
+}
+
+function onMouseMove(e) {
+    // If they're not dragging, its a hover
+    if (!drag) {
+        return;
+    }
+
+    // Get pointer position
+    let pointer = getPointerPos(e);
+
+    // Handle tools
+    switch (selectedTool) {
+        case 1: // Line tool
+            if (selectedAnnotation && selectedPage && selectedPage.id == pointer.id) { //User is selecting an annotation
+                let xs = selectedAnnotation.xs;
+                let ys = selectedAnnotation.ys;
+                xs.push(pointer.x);
+                ys.push(pointer.y);
+                selectedPage.needsUpdate = true;
+            }
+            break;
+
+        case 3: // Eraser tool
+            let page = pages[pointer.id]
+            let annotations = page.annotations;
+
+            // Filter all annotations that are close
+            annotations = annotations.filter((an) => {
+
+                switch (an.type) {
+                    case 'line':
+                        for (let i = 0; i < an.xs.length; i++) {
+                            let ax = an.xs[i];
+                            let ay = an.ys[i];
+                            let dx = ax - pointer.x;
+                            let dy = ay - pointer.y;
+                            let dt = Math.sqrt(dx * dx + dy * dy);
+
+                            if (dt <= 25) { // within 25 pixels
+                                return false;
+                            }
+                        }
+
+                        return true; // not deleted
+                    case 'text':
+                        let ax = an.x;
+                        let ay = an.y;
+                        let dx = ax - pointer.x;
+                        let dy = ay - pointer.y;
+                        let dt = Math.sqrt(dx * dx + dy * dy);
+                        return dt > 25; // within 25 px
+                    default:
+                    // Unknown annotation
+                }
+
+
+            });
+
+            // Number of annotations changed
+            if (annotations.length != page.annotations.length) {
+                // Update!
+                page.annotations = annotations;
+                page.needsUpdate = true;
+            }
+
+            break;
+    }
+
+    e.preventDefault();
+    return false;
 }
