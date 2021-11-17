@@ -7,6 +7,7 @@
     <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
     <link href="editor.css" rel="stylesheet">
     <link href="lib/font-awesome-4.7.0/css/font-awesome.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,300i,400,400i,600,600i,700,700i|Raleway:300,300i,400,400i,500,500i,600,600i,700,700i|Poppins:300,300i,400,400i,500,500i,600,600i,700,700i" rel="stylesheet">
     <link href="lib/loading-bar.min.css" rel="stylesheet">
     <title>Mobile PDF Editor</title>
 </head>
@@ -28,11 +29,26 @@
     <!-- Toolbar -->
     <div id="toolbar">
         <div id="tools">
-            <i id="tool-0" class="fa fa-arrows tool" data-tool="0" aria-hidden="true"></i>
-            <i id="tool-1" class="fa fa-pencil tool" data-tool="1" aria-hidden="true"></i>
-            <i id="tool-2" class="fa fa-font tool" data-tool="2" aria-hidden="true"></i>
-            <i id="tool-3" class="fa fa-eraser tool" data-tool="3" aria-hidden="true"></i>
-            <i id="tool-4" class="fa fa-check-circle tool" data-tool="4" style="color: #00FFAA" aria-hidden="true"></i>
+            <div class="tool" data-tool="0">
+                <i class="fa fa-arrows" aria-hidden="true"></i>
+                <span>Grab</span>
+            </div>
+            <div class="tool" data-tool="1">
+                <i class="fa fa-pencil" aria-hidden="true"></i>
+                <span>Draw</span>
+            </div>
+            <div class="tool" data-tool="2">
+                <i class="fa fa-font" aria-hidden="true"></i>
+                <span>Text</span>
+            </div>
+            <div class="tool" data-tool="3">
+                <i class="fa fa-eraser" aria-hidden="true"></i>
+                <span>Erase</span>
+            </div>
+            <div class="tool" data-tool="4" style="color: #00FFAA !important">
+                <i class="fa fa-check-circle" aria-hidden="true"></i>
+                <span>Save</span>
+            </div>
         </div>
     </div>
     <script src="lib/jquery.min.js"></script>

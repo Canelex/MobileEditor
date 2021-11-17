@@ -349,12 +349,12 @@ function setupHammer() {
 
         // Constrain vertically
         let termy = scale * el.clientHeight / 2;
-        let bonus = 100;
-        if (translate.y + termy < wh / 2 - bonus) {
-            translate.y = -termy + wh / 2 - bonus;
+        let bonus = 65;
+        if (translate.y + termy < wh / 2) {
+            translate.y = -termy + wh / 2;
         }
-        if (translate.y - termy > -wh / 2) {
-            translate.y = termy - wh / 2;
+        if (translate.y - termy > -wh / 2 + bonus) {
+            translate.y = termy - wh / 2 + bonus;
         }
 
         // Constrain scale
@@ -471,15 +471,30 @@ function selectTool(id) {
 
 function setupToolbar() {
 
-    $('.tool').click((e) => {
+    function onClickTool(target, e) {
         // Toggle CSS
-        let target = $(e.target);
         $('.tool').removeClass('active');
 
         // Get index
         let id = target.data('tool');
         selectTool(id);
+    }
 
+    $('.tool>*').click(e => {
+        // Call event code
+        let target = $(e.target);
+        onClickTool(target.parent());
+        
+        // Prevent default
+        e.preventDefault();
+        e.stopPropagation();
+    })
+
+    $('.tool').click((e) => {
+        // Call event code
+        let target = $(e.target);
+        onClickTool(target);
+        
         // Prevent default
         e.preventDefault();
         e.stopPropagation();
@@ -587,7 +602,7 @@ function onMouseDown(e) {
                 type: 'text',
                 page: pointer.id,
                 x: pointer.x,
-                y: pointer.y,
+                y: pointer.y - 10,
                 value: textarea.value,
                 typing: true
             }
