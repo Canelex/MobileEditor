@@ -425,12 +425,13 @@ function setupHammer() {
 
         // Constrain vertically
         let termy = scale * el.clientHeight / 2;
-        let bonus = 65;
-        if (translate.y + termy < wh / 2) {
-            translate.y = -termy + wh / 2;
+        let bonusTop = 65;
+        let bonusBottom = window.innerHeight * 0.7; // 70% of screen height
+        if (translate.y + termy < wh / 2 - bonusBottom) {
+            translate.y = -termy + wh / 2 - bonusBottom;
         }
-        if (translate.y - termy > -wh / 2 + bonus) {
-            translate.y = termy - wh / 2 + bonus;
+        if (translate.y - termy > -wh / 2 + bonusTop) {
+            translate.y = termy - wh / 2 + bonusTop;
         }
 
         // Constrain scale
@@ -687,11 +688,18 @@ function onMouseDown(e) {
             pages[pointer.id].annotations.push(newAnnot);
             pages[pointer.id].needsUpdate = true;
 
-            // Screen pos. Do we need to move?
-            let sp = getScreenPos(e);
-            let sy = sp.y / window.innerHeight;
-            if (window.innerWidth <= 1024 && sy > 0.5) {
-                translate.y -= (sy - 0.5) * window.innerHeight;
+            
+
+            // On mobile
+            if (/Mobi/.test(navigator.userAgent) || window.innerWidth <= 768) {
+                // Screen pos (relative units)
+                let sp = getScreenPos(e);
+                let sy = sp.y / window.innerHeight;
+                // More than 30% down
+                if (sy > 0.3) {
+                    translate.y -= (sy - 0.3) * window.innerHeight;
+                }
+
             }
 
             // Focus textbox
