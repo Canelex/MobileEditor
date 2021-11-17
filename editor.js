@@ -40,71 +40,75 @@ function loadPDF(url) {
         // List of promises
         let promises = [];
         pdfObj = pdf;
-        numPages = Math.min(5, pdf._pdfInfo.numPages);
+        numPages = pdf._pdfInfo.numPages;
         numPagesLoaded = 0;
 
         // For each page
         for (let index = 0; index < numPages; index++) {
-            // Create an element
+
+            // Create an element (page rendering)
             let el = document.createElement('div');
             el.className = 'page'
             el.setAttribute('data-id', index);
             pageList.appendChild(el);
 
-            // Empty annotations list for this page
-            pages.push({
+            // Create the annotation canvas
+            let canvas = document.createElement('canvas');
+            let context = canvas.getContext('2d')
+            canvas.className = 'page-canvas'
+            canvas.setAttribute('data-id', index);
+            el.appendChild(canvas);
+
+            // Create and store pageData
+            let pageData = {
                 id: index,
                 needsUpdate: false,
                 annotations: []
-            });
+            }
+            pages.push(pageData);
 
-            // Get the promise
+            // Get the page load promise
             let promisePage = pdfObj.getPage(index + 1)
             promises.push(promisePage);
 
             // When page loads
             promisePage.then((page) => {
-                // Get viewport
-                let vpscale = getRecommendedViewport(page);
-                let viewport = page.getViewport({ scale: vpscale });
+                // Check data validity
+                if (!(page && page._pageInfo && page._pageInfo.view)) {
+                    console.error('Failed to retrieve page info');
+                    return;
+                }
 
-                // Create annotation canvas
-                let canvas = document.createElement('canvas');
-                let context = canvas.getContext('2d')
-                canvas.className = 'page-canvas'
-                canvas.setAttribute('data-id', index);
+                // Store page metadata
+                let pageInfoView = page._pageInfo.view;
+                pageData.width = pageInfoView[2]; // Store source width
+                pageData.height = pageInfoView[3]; // Store source height
+                pageData.scale = Math.floor(2400 / pageData.height); // TODO: Smarter scaling
+
+                // Get viewport. Update element and canvas
+                let viewport = page.getViewport({ scale: pageData.scale });
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
-                el.appendChild(canvas);
-
-                // Update element
                 el.style.width = viewport.width + 'px';
                 el.style.height = viewport.height + 'px';
 
                 // Render the page
-                page.render({
-                    viewport,
-                    canvasContext: context
-                }).promise.then(() => {
+                page.render({ viewport, canvasContext: context }).promise.then(() => {
                     // Update background
                     let val = canvas.toDataURL("image/jpeg")
                     el.style.backgroundImage = `url(${val}`;
 
                     // Clear annotation canvas
                     context.clearRect(0, 0, canvas.width, canvas.height);
-
-                    // Dev
-                    context.fillStyle = 'pink'
-                    context.fillRect(0, 00, 10, 10);
                 }).catch(err => {
-                    confirm('error render page' + JSON.stringify(err));
+                    console.error('Failed to render page', err)
                 });
 
                 // Update loading bar
                 numPagesLoaded++;
                 loadingBar.set(numPagesLoaded / numPages * 100);
             }).catch(err => {
-                confirm('error load page' + JSON.stringify(err));
+                console.error('Failed to load page', err)
             });
         }
 
@@ -153,45 +157,110 @@ function savePDF() {
     // Save
     PDFLib.PDFDocument.load(pdfURL, { ignoreEncryption: true }).then(pdf => {
 
-        const url = 'https://pdf-lib.js.org/assets/small_mario.png'
-        fetch(url).then(res => {
-            res.arrayBuffer().then(buffer => {
-                pdf.embedPng(buffer).then((img) => {
-                    let page = pdf.getPages()[0];
-                    page.drawImage(img, {
-                        x: 0,
-                        y: 0,
-                        width: img.width,
-                        height: img.height,
-                    })
-                    // Save the pdf
-                    pdf.save().then(blob => {
-                        downloadBlob(blob, 'file.pdf', 'application/octet-stream')
-                    })
+        // Load font before starting PDF
+        const helvetica = pdf.embedFont(PDFLib.StandardFonts.Helvetica);
+
+        // Once font is loaded
+        helvetica.then(font => {
+
+            let promises = [];
+
+            // For each page
+            for (let i in pages) {
+                // Page data
+                let page = pages[i]
+                let pdfPage = pdf.getPages()[i];
+
+                // For each annotation
+                for (let an of page.annotations) {
+                    switch (an.type) {
+                        case 'text':
+                            // Draw text
+                            pdfPage.drawText(an.value, {
+                                x: (an.x / page.scale),
+                                y: page.height - (an.y / page.scale) - 15,
+                                font: font,
+                                size: 15
+                            })
+                            break;
+                        case 'line':
+                            let cnv = document.createElement('canvas');
+                            let c2d = cnv.getContext('2d');
+
+                            // Calculate canvas dimensions
+                            let minX = page.width * page.scale;
+                            let minY = page.width * page.scale
+                            let maxX = 0;
+                            let maxY = 0;
+                            for (let i = 0; i < an.xs.length; i++) {
+                                let x = an.xs[i];
+                                let y = an.ys[i];
+                                minX = Math.min(minX, x);
+                                minY = Math.min(minY, y);
+                                maxX = Math.max(maxX, x);
+                                maxY = Math.max(maxY, y);
+                            }
+                            // Some padding
+                            cnv.width = maxX - minX + 50; // some padding
+                            cnv.height = maxY - minY + 50;
+
+                            // Draw the line
+                            // Skip if too short
+                            let length = an.xs.length;
+                            if (length == 0) {
+                                return;
+                            }
+
+                            // Render a dot if too short
+                            if (length == 1) {
+                                c2d.fillStyle = 'black';
+                                c2d.fillRect(an.xs[0] - 3 - minX + 25, an.ys[0] - 3 - minY + 25, 6, 6)
+                                return;
+                            }
+
+                            // Render the line
+                            c2d.strokeStyle = 'black';
+                            c2d.lineWidth = 2 * page.scale;
+                            c2d.beginPath();
+                            c2d.moveTo(an.xs[0] - minX + 25, an.ys[0] - minY + 25);
+                            for (let i = 0; i < length; i++) {
+                                c2d.lineTo(an.xs[i] - minX + 25, an.ys[i] - minY + 25);
+                            }
+                            c2d.stroke();
+
+                            // Embed the image
+                            let imgData = cnv.toDataURL('image/png')
+                            let promise = pdf.embedPng(imgData);
+                            promises.push(promise);
+
+                            // Once the image is embedded
+                            promise.then(png => {
+                                // Render it
+                                pdfPage.drawImage(png, {
+                                    x: an.xs[0] / page.scale,
+                                    y: page.height - an.ys[0] / page.scale,
+                                    width: png.width / page.scale,
+                                    height: png.height / page.scale
+                                });
+                            });
+                        default:
+                            console.warn("I don't know how to render " + an.type)
+                            break;
+                    }
+                }
+            }
+
+            // Once all embeds are done
+            Promise.all(promises).then(() => {
+                // Save the pdf
+                pdf.save().then(blob => {
+                    downloadBlob(blob, 'file.pdf', 'application/octet-stream')
                 })
             })
+
+
         })
     })
-}
-
-function getRecommendedViewport(page) {
-    // Maximum height of any canvas
-    const MAX_HEIGHT_PX = 2400
-
-    // Get page info
-    let pageInfo = page._pageInfo;
-
-    // Page view is valid
-    if (pageInfo && pageInfo.view && pageInfo.view.length == 4) {
-        // Get page height
-        let pageHeight = pageInfo.view[3];
-        
-        // Calculate ratio for maximum height
-        return Math.floor(MAX_HEIGHT_PX / pageHeight)
-    }
-
-    // Default page viewport
-    return 2.0;
 }
 
 /** HammerJS */
@@ -275,8 +344,7 @@ function setupHammer() {
 
                 // Render the annotation
                 for (let an of page.annotations) {
-                    console.log('rendering', an.type);
-                    renderAnnotation(canvas, an)
+                    renderAnnotation(canvas, page, an)
                 }
 
                 page.needsUpdate = false;
@@ -286,7 +354,7 @@ function setupHammer() {
         requestAnimationFrame(update);
     }
 
-    function renderAnnotation(canvas, an) {
+    function renderAnnotation(canvas, page, an) {
         // Get context
         let c2d = canvas.getContext('2d');
 
@@ -297,15 +365,17 @@ function setupHammer() {
                 if (length == 0) {
                     return;
                 }
+
+                // Render a dot if too short
                 if (length == 1) {
                     c2d.fillStyle = 'black';
                     c2d.fillRect(an.xs[0] - 3, an.ys[0] - 3, 6, 6)
                     return;
                 }
 
-                // Render it
+                // Render the line
                 c2d.strokeStyle = 'black';
-                c2d.lineWidth = 5;
+                c2d.lineWidth = 2 * page.scale;
                 c2d.beginPath();
                 c2d.moveTo(an.xs[0], an.ys[0]);
                 for (let i = 0; i < length; i++) {
@@ -315,8 +385,10 @@ function setupHammer() {
 
                 break;
             case 'text':
+                // Scale the font (size 14)
+                let fontSize = Math.round(14 * page.scale);
                 c2d.fillStyle = 'black';
-                c2d.font = '50px Arial'
+                c2d.font = `${fontSize}px Helvetica`
 
                 // Outline
                 if (an.typing) {
@@ -324,11 +396,11 @@ function setupHammer() {
                     c2d.lineWidth = 2;
                     let w = Math.max(250, c2d.measureText(an.value).width);
                     c2d.beginPath();
-                    c2d.rect(an.x, an.y - 25, w, 60);
+                    c2d.rect(an.x, an.y, w, fontSize);
                     c2d.stroke();
                 }
 
-                c2d.fillText(an.value, an.x, an.y + 25);
+                c2d.fillText(an.value, an.x, an.y + fontSize);
                 break;
             default:
             //I don't know how to render this
@@ -484,7 +556,7 @@ function setupToolbar() {
         // Call event code
         let target = $(e.target);
         onClickTool(target.parent());
-        
+
         // Prevent default
         e.preventDefault();
         e.stopPropagation();
@@ -494,7 +566,7 @@ function setupToolbar() {
         // Call event code
         let target = $(e.target);
         onClickTool(target);
-        
+
         // Prevent default
         e.preventDefault();
         e.stopPropagation();
@@ -602,7 +674,7 @@ function onMouseDown(e) {
                 type: 'text',
                 page: pointer.id,
                 x: pointer.x,
-                y: pointer.y - 10,
+                y: pointer.y,
                 value: textarea.value,
                 typing: true
             }
