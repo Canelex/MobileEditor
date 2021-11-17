@@ -406,7 +406,7 @@ function setupHammer() {
         event.preventDefault();
         // Can only scale on hand tool
         if (selectedTool != 0) {
-            return;
+            onMouseUp(null);
         }
 
         // Store scale pos
@@ -516,6 +516,21 @@ function getRawPos(e) {
     }
 }
 
+function getScreenPos(e) {
+    // Get pageX and pageY
+    let clientX = e.clientX;
+    let clientY = e.clientY;
+    if (e.touches) { // It's on mobile!
+        let touch = e.touches[0];
+        clientX = touch.clientX;
+        clientY = touch.clientY;
+    }
+    return {
+        x: clientX,
+        y: clientY
+    }
+}
+
 function getPointerPos(e) {
     // Get raw position
     let raw = getRawPos(e);
@@ -581,9 +596,15 @@ function onMouseDown(e) {
             pages[pointer.id].annotations.push(newAnnot);
             pages[pointer.id].needsUpdate = true;
 
+            // Screen pos. Do we need to move?
+            let sp = getScreenPos(e);
+            let sy = sp.y / window.innerHeight;
+            if (window.innerWidth <= 1024 && sy > 0.5) {
+                translate.y -= (sy - 0.5) * window.innerHeight;
+            }
+
             // Focus textbox
             textarea.focus();
-
             // Delete after unfocused
             textarea.onblur = () => {
                 textarea.remove();
@@ -620,7 +641,6 @@ function onMouseUp(e) {
             break;
     }
 
-    e.preventDefault();
     return false;
 }
 
